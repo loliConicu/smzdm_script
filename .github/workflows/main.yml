@@ -1,172 +1,67 @@
-            
-            SCRIPT_RESULT=0
-            echo ""
-            echo "================================================"
-            echo "✅ 脚本 $script 运行完成，退出码: $SCRIPT_RESULT"
-            echo "结束时间: $(date '+%Y-%m-%d %H:%M:%S')"
-            echo "================================================"name: SMZDM 自动签到
+name: SMZDM 调试测试
 
 on:
-  # 定时触发 - 每天上午8点和晚上8点运行
-  schedule:
-    - cron: '0 0 * * *'    # 北京时间上午8点 (UTC+8)
-    - cron: '0 12 * * *'   # 北京时间晚上8点 (UTC+8)
-  
-  # 手动触发
   workflow_dispatch:
-  
-  # Push 触发（可选）
-  push:
-    branches: [ main, master ]
 
 jobs:
-  smzdm-checkin:
+  debug-smzdm:
     runs-on: ubuntu-latest
     
     steps:
-    # 检出代码
     - name: 检出代码
       uses: actions/checkout@v4
     
-    # 设置 Node.js 环境
     - name: 设置 Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '18'
     
-    # 安装依赖
     - name: 安装依赖
       run: |
-        # 直接安装必需的依赖包
         npm install got@11 crypto-js --no-package-lock
-        echo "依赖安装完成"
     
-    # 运行 SMZDM 签到脚本
-    - name: 运行 SMZDM 签到
+    - name: 调试环境变量和脚本
       env:
-        # 从 GitHub Secrets 中获取环境变量
         SMZDM_COOKIE: ${{ secrets.SMZDM_COOKIE }}
         SMZDM_SK: ${{ secrets.SMZDM_SK }}
-        SMZDM_USER_AGENT_APP: ${{ secrets.SMZDM_USER_AGENT_APP }}
-        SMZDM_USER_AGENT_WEB: ${{ secrets.SMZDM_USER_AGENT_WEB }}
         SMZDM_COMMENT: ${{ secrets.SMZDM_COMMENT }}
         SMZDM_CROWD_SILVER_5: ${{ secrets.SMZDM_CROWD_SILVER_5 }}
-        SMZDM_CROWD_KEYWORD: ${{ secrets.SMZDM_CROWD_KEYWORD }}
         SMZDM_TASK_TESTING: ${{ secrets.SMZDM_TASK_TESTING }}
-        # 推送通知相关（可选）
-        BARK_PUSH: ${{ secrets.BARK_PUSH }}
-        TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
-        TG_USER_ID: ${{ secrets.TG_USER_ID }}
-        QYWX_KEY: ${{ secrets.QYWX_KEY }}
-        DD_BOT_TOKEN: ${{ secrets.DD_BOT_TOKEN }}
-        DD_BOT_SECRET: ${{ secrets.DD_BOT_SECRET }}
-        SCKEY: ${{ secrets.SCKEY }}
       run: |
-        # 显示当前目录文件
-        echo "当前目录文件列表："
-        ls -la
-        
-        # 显示 Node.js 和 npm 版本
-        echo "Node.js 版本: $(node --version)"
-        echo "npm 版本: $(npm --version)"
-        
-        # 检查环境变量
-        echo "================================================"
-        echo "检查环境变量配置："
-        echo "================================================"
-        if [ -n "$SMZDM_COOKIE" ]; then
-          echo "✅ SMZDM_COOKIE 已配置 (长度: ${#SMZDM_COOKIE} 字符)"
-          echo "Cookie 前50字符预览: ${SMZDM_COOKIE:0:50}..."
+        echo "=== 环境变量检查 ==="
+        if [ -z "$SMZDM_COOKIE" ]; then
+          echo "❌ SMZDM_COOKIE 为空！这是脚本无输出的主要原因！"
+          echo "请检查 GitHub Secrets 中的配置"
+          exit 1
         else
-          echo "❌ SMZDM_COOKIE 未配置或为空"
-          echo "⚠️  没有Cookie，脚本可能不会执行任何操作"
+          echo "✅ SMZDM_COOKIE 已配置 (长度: ${#SMZDM_COOKIE})"
+          echo "前30个字符: ${SMZDM_COOKIE:0:30}..."
         fi
         
-        if [ -n "$SMZDM_SK" ]; then
-          echo "✅ SMZDM_SK 已配置"
-        else
-          echo "⚠️  SMZDM_SK 未配置 (可选，脚本会自动计算)"
+        echo ""
+        echo "=== 脚本文件检查 ==="
+        ls -la smzdm_*.js
+        
+        echo ""
+        echo "=== 运行单个脚本进行测试 ==="
+        echo "添加调试输出到脚本..."
+        
+        # 临时修改脚本添加调试信息
+        if [ -f "smzdm_checkin.js" ]; then
+          echo "console.log('🚀 SMZDM签到脚本开始运行...');" > debug_checkin.js
+          echo "console.log('Cookie长度:', process.env.SMZDM_COOKIE ? process.env.SMZDM_COOKIE.length : '未设置');" >> debug_checkin.js
+          echo "console.log('当前时间:', new Date().toISOString());" >> debug_checkin.js
+          echo "" >> debug_checkin.js
+          cat smzdm_checkin.js >> debug_checkin.js
+          
+          echo "运行调试版本的签到脚本："
+          timeout 60 node debug_checkin.js || echo "脚本运行超时或出错"
         fi
         
-        echo "其他环境变量状态："
-        [ -n "$SMZDM_COMMENT" ] && echo "✅ SMZDM_COMMENT: 已配置" || echo "⚠️  SMZDM_COMMENT: 未配置"
-        [ -n "$SMZDM_CROWD_SILVER_5" ] && echo "✅ SMZDM_CROWD_SILVER_5: $SMZDM_CROWD_SILVER_5" || echo "⚠️  SMZDM_CROWD_SILVER_5: 未配置"
-        [ -n "$SMZDM_TASK_TESTING" ] && echo "✅ SMZDM_TASK_TESTING: $SMZDM_TASK_TESTING" || echo "⚠️  SMZDM_TASK_TESTING: 未配置"
+        echo ""
+        echo "=== 检查脚本前几行内容 ==="
+        head -20 smzdm_checkin.js
         
-        # 运行主要的 SMZDM 脚本
-        echo "================================================"
-        echo "开始运行 SMZDM 脚本..."
-        echo "================================================"
-        
-        # 查找并运行所有 smzdm_ 开头的 js 文件
-        SCRIPT_COUNT=0
-        for script in smzdm_*.js; do
-          if [ -f "$script" ]; then
-            echo ""
-            echo "================================================"
-            echo "🚀 运行脚本: $script"
-            echo "开始时间: $(date '+%Y-%m-%d %H:%M:%S')"
-            echo "================================================"
-            
-            # 设置调试模式并捕获所有输出
-            echo "📝 脚本输出日志："
-            echo "---开始输出---"
-            
-            # 使用 timeout 防止脚本卡死，并确保所有输出都被捕获
-            timeout 300 node "$script" 2>&1 | tee /tmp/script_output.log || {
-              SCRIPT_RESULT=$?
-              echo "---输出结束---"
-              echo ""
-              if [ $SCRIPT_RESULT -eq 124 ]; then
-                echo "⚠️  脚本运行超时 (5分钟)，可能卡死"
-              elif [ $SCRIPT_RESULT -ne 0 ]; then
-                echo "❌ 脚本运行出错，退出码: $SCRIPT_RESULT"
-              fi
-            }
-            
-            # 检查输出内容
-            if [ -f /tmp/script_output.log ]; then
-              OUTPUT_SIZE=$(wc -l < /tmp/script_output.log)
-              echo "---输出结束---"
-              echo "📊 输出统计: $OUTPUT_SIZE 行"
-              
-              if [ $OUTPUT_SIZE -eq 0 ]; then
-                echo "⚠️  警告：脚本没有任何输出！"
-                echo "可能原因："
-                echo "1. Cookie 无效或过期"
-                echo "2. 脚本检测到环境变量缺失直接退出"
-                echo "3. 网络请求失败但被静默处理"
-                echo "4. 脚本逻辑问题"
-              fi
-              rm -f /tmp/script_output.log
-            fi
-            
-            SCRIPT_COUNT=$((SCRIPT_COUNT + 1))
-            
-            if [ $SCRIPT_COUNT -lt 4 ]; then
-              echo "等待 3 秒后运行下一个脚本..."
-              sleep 3
-            fi
-          fi
-        done
-        
-        if [ $SCRIPT_COUNT -eq 0 ]; then
-          echo "⚠️  未找到任何 smzdm_*.js 脚本文件"
-          echo "项目文件列表："
-          find . -name "*.js" -type f
-        else
-          echo ""
-          echo "🎉 总共运行了 $SCRIPT_COUNT 个脚本"
-          echo "运行完成时间: $(date '+%Y-%m-%d %H:%M:%S')"
-        fi
-    
-    # 上传日志（可选）
-    - name: 上传运行日志
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: smzdm-logs-${{ github.run_number }}
-        path: |
-          *.log
-          logs/
-        retention-days: 7
+        echo ""
+        echo "=== 搜索可能的退出条件 ==="
+        grep -n "process.exit\|return\|throw\|console.log" smzdm_checkin.js | head -10
