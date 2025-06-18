@@ -64,26 +64,60 @@ jobs:
         echo "Node.js 版本: $(node --version)"
         echo "npm 版本: $(npm --version)"
         
+        # 检查环境变量
+        echo "================================================"
+        echo "检查环境变量配置："
+        echo "================================================"
+        if [ -n "$SMZDM_COOKIE" ]; then
+          echo "✅ SMZDM_COOKIE 已配置 (长度: ${#SMZDM_COOKIE} 字符)"
+        else
+          echo "❌ SMZDM_COOKIE 未配置或为空"
+        fi
+        
+        if [ -n "$SMZDM_SK" ]; then
+          echo "✅ SMZDM_SK 已配置"
+        else
+          echo "⚠️  SMZDM_SK 未配置 (可选)"
+        fi
+        
         # 运行主要的 SMZDM 脚本
+        echo "================================================"
         echo "开始运行 SMZDM 脚本..."
+        echo "================================================"
         
         # 查找并运行所有 smzdm_ 开头的 js 文件
         SCRIPT_COUNT=0
         for script in smzdm_*.js; do
           if [ -f "$script" ]; then
+            echo ""
             echo "================================================"
-            echo "运行脚本: $script"
+            echo "🚀 运行脚本: $script"
+            echo "开始时间: $(date '+%Y-%m-%d %H:%M:%S')"
             echo "================================================"
-            node "$script"
-            SCRIPT_RESULT=$?
-            if [ $SCRIPT_RESULT -eq 0 ]; then
-              echo "✅ 脚本 $script 运行成功"
+            
+            # 捕获脚本输出
+            if node "$script" 2>&1; then
+              SCRIPT_RESULT=$?
+              echo ""
+              echo "================================================"
+              echo "✅ 脚本 $script 运行完成，退出码: $SCRIPT_RESULT"
+              echo "结束时间: $(date '+%Y-%m-%d %H:%M:%S')"
+              echo "================================================"
             else
+              SCRIPT_RESULT=$?
+              echo ""
+              echo "================================================"
               echo "❌ 脚本 $script 运行失败，退出码: $SCRIPT_RESULT"
+              echo "结束时间: $(date '+%Y-%m-%d %H:%M:%S')"
+              echo "================================================"
             fi
+            
             SCRIPT_COUNT=$((SCRIPT_COUNT + 1))
-            echo "等待 3 秒后运行下一个脚本..."
-            sleep 3
+            
+            if [ $SCRIPT_COUNT -lt 4 ]; then
+              echo "等待 3 秒后运行下一个脚本..."
+              sleep 3
+            fi
           fi
         done
         
@@ -92,7 +126,9 @@ jobs:
           echo "项目文件列表："
           find . -name "*.js" -type f
         else
+          echo ""
           echo "🎉 总共运行了 $SCRIPT_COUNT 个脚本"
+          echo "运行完成时间: $(date '+%Y-%m-%d %H:%M:%S')"
         fi
     
     # 上传日志（可选）
