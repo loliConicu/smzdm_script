@@ -1,4 +1,10 @@
-name: SMZDM 自动签到
+            
+            SCRIPT_RESULT=0
+            echo ""
+            echo "================================================"
+            echo "✅ 脚本 $script 运行完成，退出码: $SCRIPT_RESULT"
+            echo "结束时间: $(date '+%Y-%m-%d %H:%M:%S')"
+            echo "================================================"name: SMZDM 自动签到
 
 on:
   # 定时触发 - 每天上午8点和晚上8点运行
@@ -70,15 +76,22 @@ jobs:
         echo "================================================"
         if [ -n "$SMZDM_COOKIE" ]; then
           echo "✅ SMZDM_COOKIE 已配置 (长度: ${#SMZDM_COOKIE} 字符)"
+          echo "Cookie 前50字符预览: ${SMZDM_COOKIE:0:50}..."
         else
           echo "❌ SMZDM_COOKIE 未配置或为空"
+          echo "⚠️  没有Cookie，脚本可能不会执行任何操作"
         fi
         
         if [ -n "$SMZDM_SK" ]; then
           echo "✅ SMZDM_SK 已配置"
         else
-          echo "⚠️  SMZDM_SK 未配置 (可选)"
+          echo "⚠️  SMZDM_SK 未配置 (可选，脚本会自动计算)"
         fi
+        
+        echo "其他环境变量状态："
+        [ -n "$SMZDM_COMMENT" ] && echo "✅ SMZDM_COMMENT: 已配置" || echo "⚠️  SMZDM_COMMENT: 未配置"
+        [ -n "$SMZDM_CROWD_SILVER_5" ] && echo "✅ SMZDM_CROWD_SILVER_5: $SMZDM_CROWD_SILVER_5" || echo "⚠️  SMZDM_CROWD_SILVER_5: 未配置"
+        [ -n "$SMZDM_TASK_TESTING" ] && echo "✅ SMZDM_TASK_TESTING: $SMZDM_TASK_TESTING" || echo "⚠️  SMZDM_TASK_TESTING: 未配置"
         
         # 运行主要的 SMZDM 脚本
         echo "================================================"
@@ -95,21 +108,37 @@ jobs:
             echo "开始时间: $(date '+%Y-%m-%d %H:%M:%S')"
             echo "================================================"
             
-            # 捕获脚本输出
-            if node "$script" 2>&1; then
+            # 设置调试模式并捕获所有输出
+            echo "📝 脚本输出日志："
+            echo "---开始输出---"
+            
+            # 使用 timeout 防止脚本卡死，并确保所有输出都被捕获
+            timeout 300 node "$script" 2>&1 | tee /tmp/script_output.log || {
               SCRIPT_RESULT=$?
+              echo "---输出结束---"
               echo ""
-              echo "================================================"
-              echo "✅ 脚本 $script 运行完成，退出码: $SCRIPT_RESULT"
-              echo "结束时间: $(date '+%Y-%m-%d %H:%M:%S')"
-              echo "================================================"
-            else
-              SCRIPT_RESULT=$?
-              echo ""
-              echo "================================================"
-              echo "❌ 脚本 $script 运行失败，退出码: $SCRIPT_RESULT"
-              echo "结束时间: $(date '+%Y-%m-%d %H:%M:%S')"
-              echo "================================================"
+              if [ $SCRIPT_RESULT -eq 124 ]; then
+                echo "⚠️  脚本运行超时 (5分钟)，可能卡死"
+              elif [ $SCRIPT_RESULT -ne 0 ]; then
+                echo "❌ 脚本运行出错，退出码: $SCRIPT_RESULT"
+              fi
+            }
+            
+            # 检查输出内容
+            if [ -f /tmp/script_output.log ]; then
+              OUTPUT_SIZE=$(wc -l < /tmp/script_output.log)
+              echo "---输出结束---"
+              echo "📊 输出统计: $OUTPUT_SIZE 行"
+              
+              if [ $OUTPUT_SIZE -eq 0 ]; then
+                echo "⚠️  警告：脚本没有任何输出！"
+                echo "可能原因："
+                echo "1. Cookie 无效或过期"
+                echo "2. 脚本检测到环境变量缺失直接退出"
+                echo "3. 网络请求失败但被静默处理"
+                echo "4. 脚本逻辑问题"
+              fi
+              rm -f /tmp/script_output.log
             fi
             
             SCRIPT_COUNT=$((SCRIPT_COUNT + 1))
