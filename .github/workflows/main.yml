@@ -1,0 +1,85 @@
+name: SMZDM 自动签到
+
+on:
+  # 定时触发 - 每天上午8点和晚上8点运行
+  schedule:
+    - cron: '0 0 * * *'    # 北京时间上午8点 (UTC+8)
+    - cron: '0 12 * * *'   # 北京时间晚上8点 (UTC+8)
+  
+  # 手动触发
+  workflow_dispatch:
+  
+  # Push 触发（可选）
+  push:
+    branches: [ main, master ]
+
+jobs:
+  smzdm-checkin:
+    runs-on: ubuntu-latest
+    
+    steps:
+    # 检出代码
+    - name: 检出代码
+      uses: actions/checkout@v4
+    
+    # 设置 Node.js 环境
+    - name: 设置 Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    # 安装依赖
+    - name: 安装依赖
+      run: |
+        npm install got@11 crypto-js
+        # 如果有 package.json，则使用 npm install
+        if [ -f "package.json" ]; then
+          npm install
+        fi
+    
+    # 运行 SMZDM 签到脚本
+    - name: 运行 SMZDM 签到
+      env:
+        # 从 GitHub Secrets 中获取环境变量
+        SMZDM_COOKIE: ${{ secrets.SMZDM_COOKIE }}
+        SMZDM_SK: ${{ secrets.SMZDM_SK }}
+        SMZDM_USER_AGENT_APP: ${{ secrets.SMZDM_USER_AGENT_APP }}
+        SMZDM_USER_AGENT_WEB: ${{ secrets.SMZDM_USER_AGENT_WEB }}
+        SMZDM_COMMENT: ${{ secrets.SMZDM_COMMENT }}
+        SMZDM_CROWD_SILVER_5: ${{ secrets.SMZDM_CROWD_SILVER_5 }}
+        SMZDM_CROWD_KEYWORD: ${{ secrets.SMZDM_CROWD_KEYWORD }}
+        SMZDM_TASK_TESTING: ${{ secrets.SMZDM_TASK_TESTING }}
+        # 推送通知相关（可选）
+        BARK_PUSH: ${{ secrets.BARK_PUSH }}
+        TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+        TG_USER_ID: ${{ secrets.TG_USER_ID }}
+        QYWX_KEY: ${{ secrets.QYWX_KEY }}
+        DD_BOT_TOKEN: ${{ secrets.DD_BOT_TOKEN }}
+        DD_BOT_SECRET: ${{ secrets.DD_BOT_SECRET }}
+        SCKEY: ${{ secrets.SCKEY }}
+      run: |
+        # 确保脚本可执行
+        chmod +x *.js
+        
+        # 运行主要的 SMZDM 脚本
+        for script in smzdm_*.js; do
+          if [ -f "$script" ]; then
+            echo "运行脚本: $script"
+            node "$script"
+            echo "脚本 $script 运行完成"
+            echo "等待 5 秒..."
+            sleep 5
+          fi
+        done
+    
+    # 上传日志（可选）
+    - name: 上传运行日志
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: smzdm-logs-${{ github.run_number }}
+        path: |
+          *.log
+          logs/
+        retention-days: 7
