@@ -27,16 +27,13 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'npm'
     
     # 安装依赖
     - name: 安装依赖
       run: |
-        npm install got@11 crypto-js
-        # 如果有 package.json，则使用 npm install
-        if [ -f "package.json" ]; then
-          npm install
-        fi
+        # 直接安装必需的依赖包
+        npm install got@11 crypto-js --no-package-lock
+        echo "依赖安装完成"
     
     # 运行 SMZDM 签到脚本
     - name: 运行 SMZDM 签到
@@ -59,19 +56,44 @@ jobs:
         DD_BOT_SECRET: ${{ secrets.DD_BOT_SECRET }}
         SCKEY: ${{ secrets.SCKEY }}
       run: |
-        # 确保脚本可执行
-        chmod +x *.js
+        # 显示当前目录文件
+        echo "当前目录文件列表："
+        ls -la
+        
+        # 显示 Node.js 和 npm 版本
+        echo "Node.js 版本: $(node --version)"
+        echo "npm 版本: $(npm --version)"
         
         # 运行主要的 SMZDM 脚本
+        echo "开始运行 SMZDM 脚本..."
+        
+        # 查找并运行所有 smzdm_ 开头的 js 文件
+        SCRIPT_COUNT=0
         for script in smzdm_*.js; do
           if [ -f "$script" ]; then
+            echo "================================================"
             echo "运行脚本: $script"
+            echo "================================================"
             node "$script"
-            echo "脚本 $script 运行完成"
-            echo "等待 5 秒..."
-            sleep 5
+            SCRIPT_RESULT=$?
+            if [ $SCRIPT_RESULT -eq 0 ]; then
+              echo "✅ 脚本 $script 运行成功"
+            else
+              echo "❌ 脚本 $script 运行失败，退出码: $SCRIPT_RESULT"
+            fi
+            SCRIPT_COUNT=$((SCRIPT_COUNT + 1))
+            echo "等待 3 秒后运行下一个脚本..."
+            sleep 3
           fi
         done
+        
+        if [ $SCRIPT_COUNT -eq 0 ]; then
+          echo "⚠️  未找到任何 smzdm_*.js 脚本文件"
+          echo "项目文件列表："
+          find . -name "*.js" -type f
+        else
+          echo "🎉 总共运行了 $SCRIPT_COUNT 个脚本"
+        fi
     
     # 上传日志（可选）
     - name: 上传运行日志
